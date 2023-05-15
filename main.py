@@ -1,3 +1,9 @@
+"""
+Игра - "Тетрис"
+Автор: Омралин Досжан
+
+"""
+
 import pygame
 import random
 import math
@@ -183,3 +189,5 @@ class Tetris(object):
 
 if __name__ == "__main__":
     Tetris(16,30).run()
+
+# Мой личный рекорд - 16000 :)
