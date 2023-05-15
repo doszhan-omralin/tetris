@@ -1,193 +1,261 @@
 """
 Игра - "Тетрис"
 Автор: Омралин Досжан
-
 """
-
 import pygame
 import random
-import math
-import block
-import constants
+
+pygame.init()
+SCREEN = WIDTH, HEIGHT = 300, 500
+win = pygame.display.set_mode(SCREEN, pygame.NOFRAME)
+
+CELLSIZE = 20
+ROWS = (HEIGHT-120) // CELLSIZE
+COLS = WIDTH // CELLSIZE
+
+clock = pygame.time.Clock()
+FPS = 24
+
+BLACK = (21, 24, 29)
+BLUE = (31, 25, 76)
+RED = (252, 91, 122)
+WHITE = (255, 255, 255)
+
+img1 = pygame.image.load('Assets/1.png')
+img2 = pygame.image.load('Assets/2.png')
+img3 = pygame.image.load('Assets/3.png')
+img4 = pygame.image.load('Assets/4.png')
+
+Assets = {
+	1 : img1,
+	2 : img2,
+	3 : img3,
+	4 : img4
+}
 
 
-class Tetris(object):
-    def __init__(self,bx,by):
-        self.resx = bx*constants.BWIDTH+2*constants.BOARD_HEIGHT+constants.BOARD_MARGIN
-        self.resy = by*constants.BHEIGHT+2*constants.BOARD_HEIGHT+constants.BOARD_MARGIN
-        self.board_up    = pygame.Rect(0,constants.BOARD_UP_MARGIN,self.resx,constants.BOARD_HEIGHT)
-        self.board_down  = pygame.Rect(0,self.resy-constants.BOARD_HEIGHT,self.resx,constants.BOARD_HEIGHT)
-        self.board_left  = pygame.Rect(0,constants.BOARD_UP_MARGIN,constants.BOARD_HEIGHT,self.resy)
-        self.board_right = pygame.Rect(self.resx-constants.BOARD_HEIGHT,constants.BOARD_UP_MARGIN,constants.BOARD_HEIGHT,self.resy)
-        self.blk_list    = []
-        self.start_x = math.ceil(self.resx/2.0)
-        self.start_y = constants.BOARD_UP_MARGIN + constants.BOARD_HEIGHT + constants.BOARD_MARGIN
-        self.block_data = (
-            ([[0,0],[1,0],[2,0],[3,0]],constants.RED,True),
-            ([[0,0],[1,0],[0,1],[-1,1]],constants.GREEN,True),
-            ([[0,0],[1,0],[2,0],[2,1]],constants.BLUE,True),
-            ([[0,0],[0,1],[1,0],[1,1]],constants.ORANGE,False),
-            ([[-1,0],[0,0],[0,1],[1,1]],constants.GOLD,True),
-            ([[0,0],[1,0],[2,0],[1,1]],constants.PURPLE,True),
-            ([[0,0],[1,0],[2,0],[0,1]],constants.CYAN,True),
-        )
-        self.blocks_in_line = bx if bx%2 == 0 else bx-1
-        self.blocks_in_pile = by
-        self.score = 0
-        self.speed = 1
-        self.score_level = constants.SCORE_LEVEL
-
-    def apply_action(self):
-        for ev in pygame.event.get():
-            if ev.type == pygame.QUIT or (ev.type == pygame.KEYDOWN and ev.unicode == 'q'):
-                self.done = True
-            if ev.type == pygame.KEYDOWN:
-                if ev.key == pygame.K_DOWN:
-                    self.active_block.move(0,constants.BHEIGHT)
-                if ev.key == pygame.K_LEFT:
-                    self.active_block.move(-constants.BWIDTH,0)
-                if ev.key == pygame.K_RIGHT:
-                    self.active_block.move(constants.BWIDTH,0)
-                if ev.key == pygame.K_SPACE:
-                    self.active_block.rotate()
-                if ev.key == pygame.K_p:
-                    self.pause()
-
-            if ev.type == constants.TIMER_MOVE_EVENT:
-                self.active_block.move(0,constants.BHEIGHT)
-       
-    def pause(self):
-        self.print_center(["ПАУЗА","Нажмите \"p\" чтобы продолжить"])
-        pygame.display.flip()
-        while True:
-            for ev in pygame.event.get():
-                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_p:
-                    return
-       
-    def set_move_timer(self):
-        speed = math.floor(constants.MOVE_TICK / self.speed)
-        speed = max(1,speed)
-        pygame.time.set_timer(constants.TIMER_MOVE_EVENT,speed)
- 
-    def run(self):
-        pygame.init()
-        pygame.font.init()
-        self.myfont = pygame.font.SysFont(pygame.font.get_default_font(),constants.FONT_SIZE)
-        self.screen = pygame.display.set_mode((self.resx,self.resy))
-        pygame.display.set_caption("Тетрис")
-        self.set_move_timer()
-        self.done = False
-        self.game_over = False
-        self.new_block = True
-        self.print_status_line()
-        while not(self.done) and not(self.game_over):
-            self.get_block()
-            self.game_logic()
-            self.draw_game()
-        if self.game_over:
-            self.print_game_over()
-        pygame.font.quit()
-        pygame.display.quit()        
-   
-    def print_status_line(self):
-        string = ["Очков: {0}   Скорость: {1}x".format(self.score,self.speed)]
-        self.print_text(string,constants.POINT_MARGIN,constants.POINT_MARGIN)        
-
-    def print_game_over(self):
-        self.print_center(["Игра окончена","Нажмите \"q\" чтобы выйти"])
-        pygame.display.flip()
-        while True: 
-            for ev in pygame.event.get():
-                if ev.type == pygame.QUIT or (ev.type == pygame.KEYDOWN and ev.unicode == 'q'):
-                    return
-
-    def print_text(self,str_lst,x,y):
-        prev_y = 0
-        for string in str_lst:
-            size_x,size_y = self.myfont.size(string)
-            txt_surf = self.myfont.render(string,False,(255,255,255))
-            self.screen.blit(txt_surf,(x,y+prev_y))
-            prev_y += size_y 
-
-    def print_center(self,str_list):
-        max_xsize = max([tmp[0] for tmp in map(self.myfont.size,str_list)])
-        self.print_text(str_list,self.resx/2-max_xsize/2,self.resy/2)
-
-    def block_colides(self):
-        for blk in self.blk_list:
-            if blk == self.active_block:
-                continue
-            if(blk.check_collision(self.active_block.shape)):
-                return True
-        return False
-
-    def game_logic(self):
-        self.active_block.backup()
-        self.apply_action()
-        down_board  = self.active_block.check_collision([self.board_down])
-        any_border  = self.active_block.check_collision([self.board_left,self.board_up,self.board_right])
-        block_any   = self.block_colides()
-        if down_board or any_border or block_any:
-            self.active_block.restore()
-        self.active_block.backup()
-        self.active_block.move(0,constants.BHEIGHT)
-        can_move_down = not self.block_colides()  
-        self.active_block.restore()
-        if not can_move_down and (self.start_x == self.active_block.x and self.start_y == self.active_block.y):
-            self.game_over = True
-        if down_board or not can_move_down:
-            self.new_block = True
-            self.detect_line()   
- 
-    def detect_line(self):
-        for shape_block in self.active_block.shape:
-            tmp_y = shape_block.y
-            tmp_cnt = self.get_blocks_in_line(tmp_y)
-            if tmp_cnt != self.blocks_in_line:
-                continue
-            self.remove_line(tmp_y)
-            self.score += self.blocks_in_line * constants.POINT_VALUE
-            if self.score > self.score_level:
-                self.score_level *= constants.SCORE_LEVEL_RATIO
-                self.speed       *= constants.GAME_SPEEDUP_RATIO
-                self.set_move_timer()
-
-    def remove_line(self,y):
-        for block in self.blk_list:
-            block.remove_blocks(y)
-        self.blk_list = [blk for blk in self.blk_list if blk.has_blocks()]
-
-    def get_blocks_in_line(self,y):
-        tmp_cnt = 0
-        for block in self.blk_list:
-            for shape_block in block.shape:
-                tmp_cnt += (1 if y == shape_block.y else 0)            
-        return tmp_cnt
-
-    def draw_board(self):
-        pygame.draw.rect(self.screen,constants.WHITE,self.board_up)
-        pygame.draw.rect(self.screen,constants.WHITE,self.board_down)
-        pygame.draw.rect(self.screen,constants.WHITE,self.board_left)
-        pygame.draw.rect(self.screen,constants.WHITE,self.board_right)
-        self.print_status_line()
-
-    def get_block(self):
-        if self.new_block:
-            tmp = random.randint(0,len(self.block_data)-1)
-            data = self.block_data[tmp]
-            self.active_block = block.Block(data[0],self.start_x,self.start_y,self.screen,data[1],data[2])
-            self.blk_list.append(self.active_block)
-            self.new_block = False
-
-    def draw_game(self):
-        self.screen.fill(constants.BLACK)
-        self.draw_board()
-        for blk in self.blk_list:
-            blk.draw()
-        pygame.display.flip()
+font = pygame.font.Font('Fonts/Alternity-8w7J.ttf', 50)
+font2 = pygame.font.SysFont('cursive', 25)
 
 
-if __name__ == "__main__":
-    Tetris(16,30).run()
+class Tetramino:
 
-# Мой личный рекорд - 16000 :)
+
+	FIGURES = {
+		'I' : [[1, 5, 9, 13], [4, 5, 6, 7]],
+        'Z' : [[4, 5, 9, 10], [2, 6, 5, 9]],
+        'S' : [[6, 7, 9, 10], [1, 5, 6, 10]],
+        'L' : [[1, 2, 5, 9], [0, 4, 5, 6], [1, 5, 9, 8], [4, 5, 6, 10]],
+        'J' : [[1, 2, 6, 10], [5, 6, 7, 9], [2, 6, 10, 11], [3, 5, 6, 7]],
+        'T' : [[1, 4, 5, 6], [1, 4, 5, 9], [4, 5, 6, 9], [1, 5, 6, 9]],
+        'O' : [[1, 2, 5, 6]]
+	}
+
+	TYPES = ['I', 'Z', 'S', 'L', 'J', 'T', 'O']
+
+	def __init__(self, x, y):
+		self.x = x
+		self.y = y
+		self.type = random.choice(self.TYPES)
+		self.shape = self.FIGURES[self.type]
+		self.color = random.randint(1, 4)
+		self.rotation = 0
+
+	def image(self):
+		return self.shape[self.rotation]
+
+	def rotate(self):
+		self.rotation = (self.rotation + 1) % len(self.shape)
+
+class Tetris:
+	def __init__(self, rows, cols):
+		self.rows = rows
+		self.cols = cols
+		self.score = 0
+		self.level = 1
+		self.board = [[0 for j in range(cols)] for i in range(rows)]
+		self.next = None
+		self.gameover = False
+		self.new_figure()
+
+	def draw_grid(self):
+		for i in range(self.rows+1):
+			pygame.draw.line(win, WHITE, (0, CELLSIZE*i), (WIDTH, CELLSIZE*i))
+		for j in range(self.cols):
+			pygame.draw.line(win, WHITE, (CELLSIZE*j, 0), (CELLSIZE*j, HEIGHT-120))
+
+	def new_figure(self):
+		if not self.next:
+			self.next = Tetramino(5, 0)
+		self.figure = self.next
+		self.next = Tetramino(5, 0)
+
+	def intersects(self):
+		intersection = False
+		for i in range(4):
+			for j in range(4):
+				if i * 4 + j in self.figure.image():
+					if i + self.figure.y > self.rows - 1 or \
+					   j + self.figure.x > self.cols - 1 or \
+					   j + self.figure.x < 0 or \
+					   self.board[i + self.figure.y][j + self.figure.x] > 0:
+						intersection = True
+		return intersection
+
+	def remove_line(self):
+		rerun = False
+		for y in range(self.rows-1, 0, -1):
+			is_full = True
+			for x in range(0, self.cols):
+				if self.board[y][x] == 0:
+					is_full = False
+			if is_full:
+				del self.board[y]
+				self.board.insert(0, [0 for i in range(self.cols)])
+				self.score += 1
+				if self.score % 10 == 0:
+					self.level += 1
+				rerun = True
+
+		if rerun:
+			self.remove_line()
+
+	def freeze(self):
+		for i in range(4):
+			for j in range(4):
+				if i * 4 + j in self.figure.image():
+					self.board[i + self.figure.y][j + self.figure.x] = self.figure.color
+		self.remove_line()
+		self.new_figure()
+		if self.intersects():
+			self.gameover = True
+
+	def go_space(self):
+		while not self.intersects():
+			self.figure.y += 1
+		self.figure.y -= 1
+		self.freeze()
+
+	def go_down(self):
+		self.figure.y += 1
+		if self.intersects():
+			self.figure.y -= 1
+			self.freeze()
+
+	def go_side(self, dx):
+		self.figure.x += dx
+		if self.intersects():
+			self.figure.x -= dx
+
+	def rotate(self):
+		rotation = self.figure.rotation
+		self.figure.rotate()
+		if self.intersects():
+			self.figure.rotation = rotation
+
+counter = 0
+move_down = False
+can_move = True
+
+tetris = Tetris(ROWS, COLS)
+		
+running = True
+while running:
+	win.fill(BLACK)
+
+	counter += 1
+	if counter >= 10000:
+		counter = 0
+
+	if can_move:
+		if counter % (FPS // (tetris.level * 2)) == 0 or move_down:
+			if not tetris.gameover:
+				tetris.go_down()
+
+	for event in pygame.event.get():
+		if event.type == pygame.QUIT:
+			running = False
+
+		if event.type == pygame.KEYDOWN:
+			if can_move and not tetris.gameover:
+				if event.key == pygame.K_LEFT:
+					tetris.go_side(-1)
+
+				if event.key == pygame.K_RIGHT:
+					tetris.go_side(1)
+
+				if event.key == pygame.K_UP:
+					tetris.rotate()
+
+				if event.key == pygame.K_DOWN:
+					move_down = True
+
+				if event.key == pygame.K_SPACE:
+					tetris.go_space()
+
+			if event.key == pygame.K_r:
+				tetris.__init__(ROWS, COLS)
+
+			if event.key == pygame.K_p:
+				can_move = not can_move
+
+			if event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
+				running = False
+
+		if event.type == pygame.KEYUP:
+			if event.key == pygame.K_DOWN:
+				move_down = False
+
+	for x in range(ROWS):
+		for y in range(COLS):
+			if tetris.board[x][y] > 0:
+				val = tetris.board[x][y]
+				img = Assets[val]
+				win.blit(img, (y*CELLSIZE, x*CELLSIZE))
+				pygame.draw.rect(win, WHITE, (y*CELLSIZE, x*CELLSIZE,
+									CELLSIZE, CELLSIZE), 1)
+
+	if tetris.figure:
+		for i in range(4):
+			for j in range(4):
+				if i * 4 + j in tetris.figure.image():
+					img = Assets[tetris.figure.color]
+					x = CELLSIZE * (tetris.figure.x + j)
+					y = CELLSIZE * (tetris.figure.y + i)
+					win.blit(img, (x, y))
+					pygame.draw.rect(win, WHITE, (x, y, CELLSIZE, CELLSIZE), 1)
+
+
+	if tetris.gameover:
+		rect = pygame.Rect((50, 140, WIDTH-100, HEIGHT-350))
+		pygame.draw.rect(win, BLACK, rect)
+		pygame.draw.rect(win, RED, rect, 2)
+
+		over = font2.render('Game Over', True, WHITE)
+		msg1 = font2.render('Press r to restart', True, RED)
+		msg2 = font2.render('Press q to quit', True, RED)
+
+		win.blit(over, (rect.centerx-over.get_width()/2, rect.y + 20))
+		win.blit(msg1, (rect.centerx-msg1.get_width()/2, rect.y + 80))
+		win.blit(msg2, (rect.centerx-msg2.get_width()/2, rect.y + 110))
+
+
+	pygame.draw.rect(win, BLUE, (0, HEIGHT-120, WIDTH, 120))
+	if tetris.next:
+		for i in range(4):
+			for j in range(4):
+				if i * 4 + j in tetris.next.image():
+					img = Assets[tetris.next.color]
+					x = CELLSIZE * (tetris.next.x + j - 4)
+					y = HEIGHT - 100 + CELLSIZE * (tetris.next.y + i)
+					win.blit(img, (x, y))
+
+	scoreimg = font.render(f'{tetris.score}', True, WHITE)
+	levelimg = font2.render(f'Level : {tetris.level}', True, WHITE)
+	win.blit(scoreimg, (250-scoreimg.get_width()//2, HEIGHT-110))
+	win.blit(levelimg, (250-levelimg.get_width()//2, HEIGHT-30))
+
+	pygame.draw.rect(win, BLUE, (0, 0, WIDTH, HEIGHT-120), 2)
+	clock.tick(FPS)
+	pygame.display.update()
+pygame.quit()
